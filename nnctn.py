@@ -490,7 +490,8 @@ def train(args):
             if urlid not in urlids:
                 print('Error, expected output is not in the input query search record')
             else:
-                net.trainquery(wordids,urlids[:10],urlid)
+                #net.trainquery(wordids,urlids[:10],urlid)
+                net.trainquery(wordids,urlids,urlid)
                 print('update successful')
 
 
@@ -521,10 +522,8 @@ def interface():
 
 
 if __name__ == '__main__':
-    #jieba 的输出问题需要使用logging机制解决
-    logger= logging.getLogger()
-    logger.propagate = False
-    logger.setLevel(logging.ERROR)
+    #jieba 的输出问题需要使用logging机制解决,如何利用根logger屏蔽掉子logger的输出
+    logging.root.setLevel(logging.ERROR)
 
     args=interface()
     args.func(args)

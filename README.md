@@ -1,7 +1,7 @@
 # Introduction
 nnctn is a nn-based cancer type Chinese specification normalization and trace-up program.
 
-It takes variable cancer diagnostic descriptions in Chinese, normalize the to the stardard specifications in Chinese.
+It takes variable cancer diagnostic descriptions in Chinese, normalize them to the stardard specifications in Chinese.
 
 It has a neural network for improve the performance based on the users feedback.
 
