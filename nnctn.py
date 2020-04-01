@@ -15,7 +15,7 @@ import logging
 # #辅助数据及函数
 ignorewords = set([
     '恶性', '恶性肿瘤', '肿瘤', '性', '/', '的', '间', '型', '状', '样', '癌', '瘤', '腺癌', ',',
-    '，', '.', '。', ' ', '组织', '后', '小',
+    '，', '.', '。', ' ', '组织', '后', '小','复发性','未分化','低','分化','复发',
 ])
 essentialwords = set(['癌', '瘤', '白血病'])
 
@@ -171,6 +171,10 @@ class searcher:
 
     def geturlname(self, id: int):
         return self.con.execute("select url from urllist where rowid=%d" %
+                                id).fetchone()[0]
+
+    def getwordname(self, id: int):
+        return self.con.execute("select word from wordlist where rowid=%d" %
                                 id).fetchone()[0]
 
     def query(self, q: str):
@@ -456,13 +460,19 @@ def search(args):
     e=searcher('cancertypeindex.db')
     sent=args.query
     print(sent)
-    print('\t%s\t%s' % ('score','target'))
     result = e.query(sent)
     if result == None:
+        print('\tthere are not any effective words for search')
+        print('\t%s\t%s' % ('score','target'))
         print('\t%f\t%s' % (0.0, '未知'))
     else:
-        _, urlids, scores = result
-        for score, urlid in zip(scores[:10], urlids[:10]):
+        wordids, urlids, scores = result
+        wordsstr='|'.join([e.getwordname(id) for id in wordids])
+        print('\twords:\t%s' % wordsstr)
+        print('\t%s\t%s' % ('score','target'))
+
+        mounts= len(scores) if args.full else 10 #增加调试模式
+        for score, urlid in zip(scores[:mounts], urlids[:mounts]):
             print('\t%f\t%s' % (score, e.geturlname(urlid)))
     
     print()
@@ -509,6 +519,7 @@ def interface():
     # 添加子命令 search
     search_parser=subparsers.add_parser('search',help='search the query string in the index database and return hits')
     search_parser.add_argument('-q','--query',required=True,help='cancer diagnostic descriptions as query strings')
+    search_parser.add_argument('-f','--full',action='store_true',help='output all hits for debug')
     search_parser.set_defaults(func=search)
 
     # 添加子命令 train
