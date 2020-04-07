@@ -67,13 +67,14 @@ class indexer:
             return res[0]
 
     # 为每个名称建立索引
-    def addtoindex(self, url: str, soup: str):
+    def addtoindex(self, url: str, soup: str, urlen:str, urlparent:str):
         if self.isindexed(url): return
         print('Indexing {}'.format(url))
 
         words = tokenization(soup)
 
         urlid = self.getentryid('urllist', 'url', url)
+        self.update_trace_back_info(urlid, urlen, urlparent)#traceback record
 
         for i in range(len(words)):
             word = words[i]
@@ -93,21 +94,27 @@ class indexer:
                 return True
 
         return False
+    
+    def update_trace_back_info(self,urlid:int, urlen:str, urlparent:str):
+        #self.dbcommit()
+        #print(urlen,urlparent,urlid)
+        self.con.execute('update urllist set urlen="%s", urlparent="%s" where rowid=%d' % (urlen, urlparent, urlid))
+        self.dbcommit()
 
     #从癌种规范命名的列表建立索引
     def crawl(self, lib_df: pd.DataFrame):
-        lib_df['中文'].map(lambda x: self.addtoindex(x, x))
+        lib_df.apply(lambda x: self.addtoindex(x.中文, x.中文, x.TYPE_OF_CANCER_ID, x.PARENT), axis=1)
         self.dbcommit()
 
     #创建数据库表
     def createindextables(self):
-        self.con.execute('create table urllist(url)')
+        self.con.execute('create table urllist(url,urlen,urlparent)')
         self.con.execute('create table wordlist(word)')
         self.con.execute('create table wordlocation(urlid,wordid,location)')
         self.con.execute(
             'create table link(fromid integer,toid integer)')  #保存溯源关系
         self.con.execute('create index wordidx on wordlist(word) ')
-        self.con.execute('create index urlidx on urllist(url)')
+        self.con.execute('create index urlidx on urllist(url,urlen,urlparent)')
         self.con.execute('create index wordurlidx on wordlocation(wordid)')
 
         self.dbcommit()
@@ -173,6 +180,22 @@ class searcher:
     def geturlname(self, id: int):
         return self.con.execute("select url from urllist where rowid=%d" %
                                 id).fetchone()[0]
+
+    def geturltrace(self,id: int):
+        trace=''
+        urlen,urlparent = self.con.execute("select urlen, urlparent from urllist where rowid=%d" %
+                                id).fetchone()
+        trace=urlen+'->'+urlparent
+        parent=self.con.execute('select urlparent from urllist where urlen="%s" ' % urlen).fetchone()
+        while(parent):
+            trace=trace+'->'+parent[0]
+            urlen=parent[0]
+            parent=self.con.execute('select urlparent from urllist where urlen="%s" ' % urlen).fetchone()
+        
+        return trace
+
+
+
 
     def getwordname(self, id: int):
         return self.con.execute("select word from wordlist where rowid=%d" %
@@ -464,17 +487,17 @@ def search(args):
     result = e.query(sent)
     if result == None:
         print('\tthere are not any effective words for search')
-        print('\t%s\t%s' % ('score','target'))
-        print('\t%f\t%s' % (0.0, '未知'))
+        print('\t%s\t%s\t%s' % ('score','target','trace'))
+        print('\t%f\t%s\t%s' % (0.0, '未知','nan'))
     else:
         wordids, urlids, scores = result
         wordsstr='|'.join([e.getwordname(id) for id in wordids])
         print('\twords:\t%s' % wordsstr)
-        print('\t%s\t%s' % ('score','target'))
+        print('\t%s\t%s\t%s' % ('score','target','trace'))
 
         mounts= len(scores) if args.full else 10 #增加调试模式
         for score, urlid in zip(scores[:mounts], urlids[:mounts]):
-            print('\t%f\t%s' % (score, e.geturlname(urlid)))
+            print('\t%f\t%s\t%s' % (score, e.geturlname(urlid),e.geturltrace(urlid)))
     
     print()
 
